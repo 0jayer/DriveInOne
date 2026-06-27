@@ -16,3 +16,4 @@ class GCSProvider(StorageProvider):
     def delete_file(self, remote_key):
         # Implement GCS file deletion logic here
         print(f"[GCS] Deleting {remote_key} from GCS")
+        
