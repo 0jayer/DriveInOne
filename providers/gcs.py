@@ -12,3 +12,7 @@ class GCSProvider(StorageProvider):
     def download_file(self, file_path, remote_key):
         # Implement GCS file download logic here
         print(f"[GCS] Downloading {remote_key} to {file_path}")
+
+    def delete_file(self, remote_key):
+        # Implement GCS file deletion logic here
+        print(f"[GCS] Deleting {remote_key} from GCS")

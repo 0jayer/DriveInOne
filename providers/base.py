@@ -22,3 +22,8 @@ class StorageProvider(ABC):
     def download_file(self, file_path, remote_key):
         """Download file from the storage provider"""
         pass
+
+    @abstractmethod
+    def delete_file(self, remote_key):
+        """Delete file from the storage provider"""
+        pass
