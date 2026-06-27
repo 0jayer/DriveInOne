@@ -1,10 +1,11 @@
 from providers.gcs import GCSProvider
+from providers.dropbox import DropboxProvider
 
 
 class StorageFactory:
     _providers = {
         "gcs": GCSProvider,
-        #"dropbox": DropboxProvider,
+        "dropbox": DropboxProvider,
      }
 
     @staticmethod
