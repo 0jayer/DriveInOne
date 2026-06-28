@@ -17,24 +17,27 @@ class DistributionUpload:
         # 3. loop through sorted providers, calculate offset and size for each
         allocations = []
         remaining_size = self.file_size
+        offset = 0
         for provider in sorted_providers:
             if remaining_size <= 0:
                 break
             
             allocated_size = min(remaining_size, provider["free_space"])
-            allocations.append((provider, allocated_size))
+            allocations.append((provider, allocated_size, offset))
             remaining_size -= allocated_size
+            offset = self.file_size - remaining_size
+
         # 4. return a list of allocations
         return allocations
     
     def upload(self, allocations):
         threads = []
-        for provider, size in allocations:
-            t = threading.Thread(target=self._upload_chunk, args=(provider, size))
+        for provider, size, offset in allocations:
+            t = threading.Thread(target=self._upload_chunk, args=(provider, size, offset))
             threads.append(t)
             t.start()
         for t in threads:
             t.join()
 
-    def _upload_chunk(self, provider, size):
-        print(f"Uploading {size} bytes to {provider['name']}")
+    def _upload_chunk(self, provider, size, offset):
+        print(f"Uploading {size} bytes to {provider['name']} at offset {offset}")
