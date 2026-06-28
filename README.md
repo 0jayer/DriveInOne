@@ -1,5 +1,8 @@
-# DriveInOne 
+<p align="center">
+  <img src="assets/DriveInOne_logo.png" alt="DriveInOne Logo" width="700"/>
+</p>
 
+# DriveInOne 
 > **One app. All your cloud storage. One unified drive.**
 
 DriveInOne is a virtual file system that connects all your cloud storage accounts — Google Drive, Dropbox, OneDrive, and more — and presents them as a single unified storage space. Upload, download, delete, and browse all your files, images, and videos from one place.
@@ -48,7 +51,7 @@ DriveInOne/
 
 ---
 
-##  Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -60,7 +63,7 @@ DriveInOne/
 
 ---
 
-##  Getting Started
+## Getting Started
 
 ### Prerequisites
 
