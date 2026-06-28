@@ -1,10 +1,10 @@
-from providers.gcs import GCSProvider
+from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 
 
 class StorageFactory:
     _providers = {
-        "gcs": GCSProvider,
+        "gdrive": GoogleDriveProvider,
         "dropbox": DropboxProvider,
      }
 
