@@ -1,4 +1,4 @@
-from abc import  ABC, abstractmethod
+from abc import ABC, abstractmethod
 
 
 class StorageProvider(ABC):
@@ -6,20 +6,24 @@ class StorageProvider(ABC):
         self._bucket = bucket
         self._region = region
 
-
     def __repr__(self):
         return f"StorageProvider(bucket={self._bucket!r}, region={self._region!r})"
-    
+
     def __str__(self):
         return f"StorageProvider(bucket={self._bucket})"
 
     @abstractmethod
     def upload_file(self, file_path, remote_key):
-        """Upload file to the storage provider"""
+        """Upload a whole file to the storage provider"""
         pass
-    
+
     @abstractmethod
-    def download_file(self, file_path, remote_key):
+    def upload_bytes(self, data: bytes, remote_key: str):
+        """Upload raw bytes (a chunk) to the storage provider"""
+        pass
+
+    @abstractmethod
+    def download_file(self, remote_key, local_path):
         """Download file from the storage provider"""
         pass
 

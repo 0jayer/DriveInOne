@@ -1,6 +1,17 @@
 import pytest
 from distribution.upload import DistributionUpload
 from providers.base import StorageProvider
+import tempfile, os
+
+# create a dummy file of the right size instead of passing an integer
+with tempfile.NamedTemporaryFile(delete=False) as f:
+    f.write(b'\x00' * 500)
+    tmp_path = f.name
+
+dist = DistributionUpload(tmp_path, providers)
+allocations = dist.allocate()
+total = sum(size for _, size, _, _ in allocations)  # unpack 4 values now
+os.unlink(tmp_path)  # clean up
 
 def test_storage_provider_cannot_be_instantiated():
     with pytest.raises(TypeError):
