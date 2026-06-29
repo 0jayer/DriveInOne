@@ -75,6 +75,28 @@ class GoogleDriveProvider(StorageProvider):
 
         print(f"[GoogleDrive] Downloaded '{remote_key}' → {local_path}")
 
+
+    def download_bytes(self, remote_key: str) -> bytes:
+        results = self._service.files().list(
+            q=f"name='{remote_key}'",
+            fields="files(id, name)"
+        ).execute()
+        files = results.get("files", [])
+        if not files:
+            raise FileNotFoundError(f"Chunk '{remote_key}' not found in Google Drive")
+
+        file_id = files[0]["id"]
+        request = self._service.files().get_media(fileId=file_id)
+
+        buffer = io.BytesIO()
+        downloader = MediaIoBaseDownload(buffer, request)
+        done = False
+        while not done:
+            _, done = downloader.next_chunk()
+
+        print(f"[GoogleDrive] Downloaded chunk '{remote_key}' ({buffer.tell()} bytes)")
+        return buffer.getvalue()
+
     def delete_file(self, remote_key):
         results = self._service.files().list(
             q=f"name='{remote_key}'",
@@ -96,3 +118,18 @@ class GoogleDriveProvider(StorageProvider):
         for file in files:
             print(f"{file['name']} ({file.get('size', 'N/A')} bytes)")
         return files
+    
+    def get_account_email(self) -> str:
+        about = self._service.about().get(fields="user").execute()
+        return about["user"]["emailAddress"]
+
+    def get_total_space(self) -> tuple[int, int]:
+        about = self._service.about().get(fields="storageQuota").execute()
+        quota = about["storageQuota"]
+        total = int(quota["limit"])
+        used = int(quota["usage"])
+        return total, used
+
+    def get_free_space(self) -> int:
+        total, used = self.get_total_space()
+        return total - used

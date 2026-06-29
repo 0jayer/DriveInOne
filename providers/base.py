@@ -24,7 +24,12 @@ class StorageProvider(ABC):
 
     @abstractmethod
     def download_file(self, remote_key, local_path):
-        """Download file from the storage provider"""
+        """Download file from the storage provider to disk"""
+        pass
+
+    @abstractmethod
+    def download_bytes(self, remote_key: str) -> bytes:
+        """Download a chunk from the storage provider, return raw bytes"""
         pass
 
     @abstractmethod

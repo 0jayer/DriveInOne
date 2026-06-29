@@ -36,24 +36,28 @@ class DistributionUpload:
     def upload(self, allocations, owner="default", virtual_path=None):
         self._results = []
         threads = []
+        total_chunks = len(allocations)          # add this
         for provider, size, offset, chunk_index in allocations:
             t = threading.Thread(
                 target=self._upload_chunk,
-                args=(provider, size, offset, chunk_index)
+                args=(provider, size, offset, chunk_index, total_chunks)   # pass it down
             )
             threads.append(t)
             t.start()
         for t in threads:
             t.join()
 
-        # All threads done — write to DB sequentially (no threading issues)
         self._record_to_db(owner, virtual_path)
 
-    def _upload_chunk(self, provider, size, offset, chunk_index):
+    def _upload_chunk(self, provider, size, offset, chunk_index, total_chunks):
         filename = os.path.basename(self.file_path)
-        remote_key = f"{filename}_chunk_{chunk_index}"
+        
+        # use original filename if no splitting needed, chunk name if split
+        if total_chunks == 1:
+            remote_key = filename
+        else:
+            remote_key = f"{filename}_chunk_{chunk_index}"
 
-        # Read only the bytes belonging to this chunk
         with open(self.file_path, "rb") as f:
             f.seek(offset)
             data = f.read(size)
@@ -71,7 +75,6 @@ class DistributionUpload:
             })
 
         print(f"[Upload] Chunk {chunk_index}: {size} bytes → {provider['name']} as '{remote_key}'")
-
     def _file_checksum(self):
         sha256 = hashlib.sha256()
         with open(self.file_path, "rb") as f:

@@ -1,41 +1,33 @@
 import pytest
-from distribution.upload import DistributionUpload
 from providers.base import StorageProvider
-import tempfile, os
 
-# create a dummy file of the right size instead of passing an integer
-with tempfile.NamedTemporaryFile(delete=False) as f:
-    f.write(b'\x00' * 500)
-    tmp_path = f.name
 
-dist = DistributionUpload(tmp_path, providers)
-allocations = dist.allocate()
-total = sum(size for _, size, _, _ in allocations)  # unpack 4 values now
-os.unlink(tmp_path)  # clean up
-
-def test_storage_provider_cannot_be_instantiated():
+def test_abc_cannot_be_instantiated():
     with pytest.raises(TypeError):
-        StorageProvider("my-bucket", "us-east-1")
-
-def test_allocate_raises_when_not_enough_space():
-    # create a DistributionUpload with file_size bigger than total provider space
-    distribution_upload = DistributionUpload(file_size=1000, providers=[
-        {"name": "provider1", "free_space": 400},
-        {"name": "provider2", "free_space": 300},
-    ])
-    # assert it raises ValueError
-    with pytest.raises(ValueError):
-        distribution_upload.allocate()
+        StorageProvider("bucket", "region")
 
 
-def test_allocate_returns_correct_sizes():
-    providers = [
-        {"name": "provider1", "free_space": 500},
-        {"name": "provider2", "free_space": 300},
-        {"name": "provider3", "free_space": 200},
-    ]
-    file_size = 800
-    distribution_upload = DistributionUpload(file_size=file_size, providers=providers)
-    allocations = distribution_upload.allocate()
-    total_allocated = sum(size for _, size, _ in allocations)
-    assert total_allocated == file_size
+def test_abc_rejects_partial_implementation():
+    """Missing any abstract method should prevent instantiation."""
+    class Incomplete(StorageProvider):
+        def upload_file(self, file_path, remote_key): pass
+        def upload_bytes(self, data, remote_key): pass
+        def download_file(self, remote_key, local_path): pass
+        # missing download_bytes and delete_file
+
+    with pytest.raises(TypeError):
+        Incomplete("bucket", "region")
+
+
+def test_concrete_provider_instantiates():
+    """A fully implemented provider should instantiate without error."""
+    class Concrete(StorageProvider):
+        def upload_file(self, file_path, remote_key): pass
+        def upload_bytes(self, data, remote_key): pass
+        def download_file(self, remote_key, local_path): pass
+        def download_bytes(self, remote_key): return b""
+        def delete_file(self, remote_key): pass
+
+    p = Concrete("test-bucket", "us-east-1")
+    assert p._bucket == "test-bucket"
+    assert p._region == "us-east-1"

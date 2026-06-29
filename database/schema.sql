@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS providers (
     token             TEXT,
     refresh_token     TEXT,
     token_expiry      TEXT,
-    total_space_bytes INTEGER,
-    used_space_bytes  INTEGER,
+    total_space_bytes BIGINT,
+    used_space_bytes  BIGINT,
     website_url       TEXT,
     last_synced       TEXT
 );
