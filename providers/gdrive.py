@@ -11,11 +11,19 @@ class GoogleDriveProvider(StorageProvider):
         super().__init__(bucket="gdrive", region="global")
         self._credentials_path = credentials_path
         self._service = None  # will hold the authenticated Drive API client
-        
+        self.authenticate()
 
     def delete_file(self, remote_key):
-        print(f"[GoogleDrive] Deleting {remote_key}")
-
+        results = self._service.files().list(
+            q=f"name='{remote_key}'",
+            fields="files(id, name)"
+        ).execute()
+        files = results.get("files", [])
+        if files:
+            self._service.files().delete(fileId=files[0]["id"]).execute()
+            print(f"[GoogleDrive] Deleted '{remote_key}'")
+        else:
+            raise FileNotFoundError(f"File '{remote_key}' not found in Google Drive")
 
     def authenticate(self):
         SCOPES = ["https://www.googleapis.com/auth/drive"]
@@ -62,7 +70,7 @@ class GoogleDriveProvider(StorageProvider):
         return file
     
     def download_file(self, remote_key, local_path):
-        
+
         # find file by name
         results = self._service.files().list(
             q=f"name='{remote_key}'",
