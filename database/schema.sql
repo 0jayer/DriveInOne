@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS providers (
-    provider_id       INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider_id       SERIAL PRIMARY KEY ,
     provider_type     TEXT NOT NULL,
     account_email     TEXT NOT NULL,
     account_nickname  TEXT,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS providers (
 
 
 CREATE TABLE IF NOT EXISTS files (
-    file_id                             INTEGER PRIMARY KEY AUTOINCREMENT,
+    file_id                             SERIAL PRIMARY KEY ,
     original_filename                   TEXT NOT NULL,
     file_type                           TEXT NOT NULL,
     total_size_bytes                    INTEGER NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS files (
 );
 
 CREATE TABLE IF NOT EXISTS chunks (
-    chunk_id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+    chunk_id                    SERIAL PRIMARY KEY,
     file_id                     INTEGER NOT NULL,
     chunk_index                 INTEGER NOT NULL,
     chunk_size_bytes            INTEGER NOT NULL,
