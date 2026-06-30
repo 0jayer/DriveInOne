@@ -31,6 +31,13 @@ def register_provider(conn, user_id, provider_type, email, nickname, total, used
     print(f"[DB] Registered {provider_type} account '{email}' (provider_id={provider_id})")
     return provider_id
 
+def get_provider_by_id(conn, provider_id):
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT provider_type, token, refresh_token FROM providers WHERE provider_id = %s",
+        (provider_id,)
+    )
+    return cursor.fetchone()
 
 def get_providers_for_user(conn, user_id):
     cursor = conn.cursor()

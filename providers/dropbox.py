@@ -22,6 +22,7 @@ class DropboxProvider(StorageProvider):
                 app_key=self._app_key,
                 app_secret=self._app_secret,
             )
+            print("[Dropbox] Authenticated successfully")    # add this
         else:
             # Run OAuth flow
             self._client = self._run_oauth_flow()

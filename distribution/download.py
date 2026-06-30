@@ -4,6 +4,7 @@ from database.db import Database
 from database.files import get_files_for_user, get_file_metadata, get_chunks_for_file
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
+from database.providers import get_provider_by_id
 
 
 class DistributionDownload:
@@ -14,17 +15,14 @@ class DistributionDownload:
     def _load_provider(self, provider_id):
         if provider_id in self._provider_cache:
             return self._provider_cache[provider_id]
-
-        cursor = self._conn.cursor()
-        cursor.execute(
-            "SELECT provider_type, token, refresh_token FROM providers WHERE provider_id = %s",
-            (provider_id,)
-        )
-        row = cursor.fetchone()
+        
+        row = get_provider_by_id(self._conn, provider_id)
+        
         if not row:
             raise ValueError(f"Provider {provider_id} not found in DB")
-
+        
         provider_type, token, refresh_token = row
+
 
         if provider_type == "gdrive":
             instance = GoogleDriveProvider("credentials/google_credentials.json", token=token, refresh_token=refresh_token)
