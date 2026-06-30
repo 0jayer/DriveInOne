@@ -3,6 +3,7 @@ import hashlib
 import os
 import datetime
 from database.db import Database
+from database.files import insert_file, insert_chunk
 
 
 class DistributionUpload:
@@ -36,11 +37,11 @@ class DistributionUpload:
     def upload(self, allocations, owner="default", virtual_path=None):
         self._results = []
         threads = []
-        total_chunks = len(allocations)          # add this
+        total_chunks = len(allocations)
         for provider, size, offset, chunk_index in allocations:
             t = threading.Thread(
                 target=self._upload_chunk,
-                args=(provider, size, offset, chunk_index, total_chunks)   # pass it down
+                args=(provider, size, offset, chunk_index, total_chunks)
             )
             threads.append(t)
             t.start()
@@ -51,8 +52,7 @@ class DistributionUpload:
 
     def _upload_chunk(self, provider, size, offset, chunk_index, total_chunks):
         filename = os.path.basename(self.file_path)
-        
-        # use original filename if no splitting needed, chunk name if split
+
         if total_chunks == 1:
             remote_key = filename
         else:
@@ -75,6 +75,7 @@ class DistributionUpload:
             })
 
         print(f"[Upload] Chunk {chunk_index}: {size} bytes → {provider['name']} as '{remote_key}'")
+
     def _file_checksum(self):
         sha256 = hashlib.sha256()
         with open(self.file_path, "rb") as f:
@@ -89,41 +90,22 @@ class DistributionUpload:
         total_chunks = len(self._results)
         file_checksum = self._file_checksum()
 
-        # chunk_index 0 is always the first/primary provider
         primary = next(r for r in self._results if r["chunk_index"] == 0)
         primary_provider_id = primary["provider_id"]
 
         conn = Database.get_instance()
-        cursor = conn.cursor()
 
-        cursor.execute("""
-            INSERT INTO files (
-                original_filename, file_type, total_size_bytes, total_chunks,
-                virtual_path, uploaded_at, checksum_file, owner, uploaded_provider_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING file_id
-        """, (
-            filename, file_ext, self.file_size, total_chunks,
-            virtual_path, datetime.datetime.utcnow().isoformat(),
-            file_checksum, owner, primary_provider_id
-        ))
-
-        file_id = cursor.fetchone()[0]
+        file_id = insert_file(
+            conn, owner, filename, file_ext, self.file_size, total_chunks,
+            virtual_path, datetime.datetime.now(datetime.UTC).isoformat(),
+            file_checksum, primary_provider_id
+        )
 
         for result in sorted(self._results, key=lambda r: r["chunk_index"]):
-            cursor.execute("""
-                INSERT INTO chunks (
-                    file_id, chunk_index, chunk_size_bytes,
-                    remote_key, checksum_chunk, provider_id
-                ) VALUES (%s, %s, %s, %s, %s, %s)
-            """, (
-                file_id,
-                result["chunk_index"],
-                result["chunk_size_bytes"],
-                result["remote_key"],
-                result["checksum_chunk"],
-                result["provider_id"],
-            ))
+            insert_chunk(
+                conn, file_id, result["chunk_index"], result["chunk_size_bytes"],
+                result["remote_key"], result["checksum_chunk"], result["provider_id"]
+            )
 
         conn.commit()
         print(f"[DB] Recorded '{filename}' (file_id={file_id}) with {total_chunks} chunk(s)")

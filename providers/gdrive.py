@@ -1,37 +1,62 @@
 from providers.base import StorageProvider
 from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
+import json
 import io
 import os
 
 
 class GoogleDriveProvider(StorageProvider):
-    def __init__(self, credentials_path):
+    SCOPES = ["https://www.googleapis.com/auth/drive"]
+
+    def __init__(self, credentials_path, token=None, refresh_token=None):
         super().__init__(bucket="gdrive", region="global")
         self._credentials_path = credentials_path
         self._service = None
-        self.authenticate()
+        self._creds = None
 
-    def authenticate(self):
-        SCOPES = ["https://www.googleapis.com/auth/drive"]
-        token_path = "credentials/token.json"
+        if token and refresh_token:
+            self._load_from_tokens(token, refresh_token)
+        else:
+            self._run_oauth_flow()
 
-        creds = None
-        if os.path.exists(token_path):
-            creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-
-        if not creds or not creds.valid:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                self._credentials_path, SCOPES
-            )
-            creds = flow.run_local_server(port=0)
-            with open(token_path, "w") as token:
-                token.write(creds.to_json())
-
-        self._service = build("drive", "v3", credentials=creds)
+        self._service = build("drive", "v3", credentials=self._creds)
         print("[GoogleDrive] Authenticated successfully")
+
+    def _client_config(self):
+        """Read client_id/secret out of the credentials file (app-level, never changes)."""
+        with open(self._credentials_path, "r") as f:
+            data = json.load(f)
+        # works whether the file uses "installed" or "web" key
+        key = "installed" if "installed" in data else "web"
+        return data[key]["client_id"], data[key]["client_secret"]
+
+    def _load_from_tokens(self, token, refresh_token):
+        client_id, client_secret = self._client_config()
+        self._creds = Credentials(
+            token=token,
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=client_id,
+            client_secret=client_secret,
+            scopes=self.SCOPES,
+        )
+        if not self._creds.valid:
+            self._creds.refresh(Request())
+            print("[GoogleDrive] Access token refreshed")
+
+    def _run_oauth_flow(self):
+        flow = InstalledAppFlow.from_client_secrets_file(
+            self._credentials_path, self.SCOPES
+        )
+        self._creds = flow.run_local_server(port=0)
+
+    def get_tokens(self):
+        """Return (access_token, refresh_token) after auth — for saving to DB."""
+        return self._creds.token, self._creds.refresh_token
 
     def upload_file(self, file_path, remote_key):
         file_metadata = {"name": remote_key}
@@ -75,7 +100,6 @@ class GoogleDriveProvider(StorageProvider):
 
         print(f"[GoogleDrive] Downloaded '{remote_key}' → {local_path}")
 
-
     def download_bytes(self, remote_key: str) -> bytes:
         results = self._service.files().list(
             q=f"name='{remote_key}'",
@@ -118,7 +142,7 @@ class GoogleDriveProvider(StorageProvider):
         for file in files:
             print(f"{file['name']} ({file.get('size', 'N/A')} bytes)")
         return files
-    
+
     def get_account_email(self) -> str:
         about = self._service.about().get(fields="user").execute()
         return about["user"]["emailAddress"]

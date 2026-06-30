@@ -1,63 +1,33 @@
-import datetime
 from database.db import Database
+from database.users import get_or_create_user
+from database.providers import register_provider
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 
 
-def register_provider(conn, provider_type, email, nickname, total, used, url,
-                      token=None, refresh_token=None):
-    cursor = conn.cursor()
-
-    cursor.execute(
-        "SELECT provider_id FROM providers WHERE account_email = %s AND provider_type = %s",
-        (email, provider_type)
-    )
-    existing = cursor.fetchone()
-
-    if existing:
-        print(f"[Setup] {provider_type} account '{email}' already registered (provider_id={existing[0]}) — skipping")
-        return
-
-    cursor.execute("""
-        INSERT INTO providers (
-            provider_type, account_email, account_nickname,
-            total_space_bytes, used_space_bytes, website_url,
-            token, refresh_token, last_synced
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-        RETURNING provider_id
-    """, (
-        provider_type, email, nickname,
-        total, used, url,
-        token, refresh_token,
-        datetime.datetime.now(datetime.UTC).isoformat()
-    ))
-
-    provider_id = cursor.fetchone()[0]
-    conn.commit()
-    print(f"[Setup] Registered {provider_type} account '{email}' (provider_id={provider_id})")
-
-
-def setup_gdrive(conn):
+def setup_gdrive(conn, user_id):
     print("\n[Google Drive] Starting OAuth — browser will open...")
     provider = GoogleDriveProvider("credentials/google_credentials.json")
     email = provider.get_account_email()
     total, used = provider.get_total_space()
-    nickname = input(f"  Nickname for this account [{email}]: ").strip() or email
-    register_provider(conn, "gdrive", email, nickname, total, used, "https://drive.google.com")
+    access_token, refresh_token = provider.get_tokens()
+    nickname = input(f"  Nickname for this Google account [{email}]: ").strip() or email
+    register_provider(conn, user_id, "gdrive", email, nickname, total, used,
+                      "https://drive.google.com", access_token, refresh_token)
 
 
-def setup_dropbox(conn):
+def setup_dropbox(conn, user_id):
     print("\n[Dropbox] Starting OAuth flow...")
-    provider = DropboxProvider()  # triggers _run_oauth_flow
+    provider = DropboxProvider()
     email = provider.get_account_email()
     total, used = provider.get_total_space()
     access_token, refresh_token = provider.get_tokens()
-    nickname = input(f"  Nickname for this account [{email}]: ").strip() or email
-    register_provider(conn, "dropbox", email, nickname, total, used,
+    nickname = input(f"  Nickname for this Dropbox account [{email}]: ").strip() or email
+    register_provider(conn, user_id, "dropbox", email, nickname, total, used,
                       "https://dropbox.com", access_token, refresh_token)
 
 
-def main():
+def interactive_setup(conn, user_id):
     print("=== DriveInOne Setup ===")
     print("Which providers do you want to register?")
     print("  1) Google Drive")
@@ -66,20 +36,25 @@ def main():
 
     choice = input("\nEnter choice (1/2/3): ").strip()
 
-    conn = Database.get_instance()
-
     if choice == "1":
-        setup_gdrive(conn)
+        setup_gdrive(conn, user_id)
     elif choice == "2":
-        setup_dropbox(conn)
+        setup_dropbox(conn, user_id)
     elif choice == "3":
-        setup_gdrive(conn)
-        setup_dropbox(conn)
+        setup_gdrive(conn, user_id)
+        setup_dropbox(conn, user_id)
     else:
         print("Invalid choice — exiting")
         return
 
-    print("\n[Setup] Done. Run 'python main.py' to start uploading.")
+    print("\n[Setup] Done.")
+
+
+def main():
+    conn = Database.get_instance()
+    username = input("Username: ").strip()
+    user_id = get_or_create_user(conn, username)
+    interactive_setup(conn, user_id)
 
 
 if __name__ == "__main__":
