@@ -1,9 +1,12 @@
 import mimetypes
 import os
 import tempfile
+from pathlib import Path
 import jwt
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from pydantic import BaseModel
 
 from database.db import Database
@@ -20,10 +23,19 @@ from distribution.download import DistributionDownload
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, StreamingResponse
 from urllib.parse import quote
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+
 app = FastAPI(title="DriveInOne API")
+
+@app.on_event("startup")
+def initialize_database():
+    try:
+        Database.init_db()
+    except Exception as exc:
+        print(f"[Startup] Database initialization skipped: {exc}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -37,12 +49,12 @@ app.add_middleware(
 bearer_scheme = HTTPBearer()
 
 
-FRONTEND_URL = "http://127.0.0.1:5500"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5500")
 # --- OAuth config ---
 GOOGLE_CREDENTIALS_PATH = "credentials/google_credentials.json"          # Desktop client — CLI (setup.py) only
 GOOGLE_WEB_CREDENTIALS_PATH = "credentials/google_credentials_web.json"  # Web client — API redirect flow
-GOOGLE_REDIRECT_URI = "http://127.0.0.1:8000/accounts/gdrive/callback"
-DROPBOX_REDIRECT_URI = "http://127.0.0.1:8000/accounts/dropbox/callback"
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/accounts/gdrive/callback")
+DROPBOX_REDIRECT_URI = os.getenv("DROPBOX_REDIRECT_URI", "http://127.0.0.1:8000/accounts/dropbox/callback")
 
 
 # --- Auth dependency ---
@@ -74,8 +86,16 @@ class LoginRequest(BaseModel):
 
 # --- Core endpoints ---
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/")
 def root():
+    index_path = FRONTEND_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
     return {"status": "DriveInOne API is running"}
 
 
@@ -313,3 +333,6 @@ def dropbox_callback(code: str, state: str):
     )
 
     return RedirectResponse(url=f"{FRONTEND_URL}/dashboard.html?connected=dropbox")
+
+
+app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

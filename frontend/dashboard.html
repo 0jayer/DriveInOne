@@ -335,6 +335,7 @@ function setDownloadProgressVisible(visible, percentage = 0, message = "") {
 function downloadFile(fileId, buttonEl) {
   const xhr = new XMLHttpRequest();
   const token = getToken();
+  const base = API_BASE || "";
 
   if (buttonEl) {
     buttonEl.disabled = true;
@@ -342,7 +343,7 @@ function downloadFile(fileId, buttonEl) {
   }
   setDownloadProgressVisible(true, 0, "Preparing download…");
 
-  xhr.open("GET", `${API_BASE}/files/${fileId}/download`, true);
+  xhr.open("GET", `${base}/files/${fileId}/download`, true);
   xhr.setRequestHeader("Authorization", `Bearer ${token}`);
   xhr.responseType = "blob";
 

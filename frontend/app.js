@@ -6,7 +6,7 @@
    HTML artifacts, which can't use it).
 =========================================================== */
 
-const API_BASE = "http://127.0.0.1:8000";
+const API_BASE = window.__API_BASE__ || (window.location.hostname === "localhost" ? "http://127.0.0.1:8000" : "");
 const TOKEN_KEY = "driveinone_token";
 const USERNAME_KEY = "driveinone_username";
 
@@ -48,7 +48,8 @@ async function apiFetch(path, options = {}) {
   const token = getToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const resp = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  const base = API_BASE || "";
+  const resp = await fetch(`${base}${path}`, { ...options, headers });
 
   if (resp.status === 401) {
     clearSession();
@@ -92,8 +93,9 @@ async function uploadFile(file, onProgress) {
     const xhr = new XMLHttpRequest();
     const formData = new FormData();
     formData.append("file", file);
+    const base = API_BASE || "";
 
-    xhr.open("POST", `${API_BASE}/upload`);
+    xhr.open("POST", `${base}/upload`);
     xhr.setRequestHeader("Authorization", `Bearer ${getToken()}`);
 
     xhr.upload.onprogress = (e) => {
