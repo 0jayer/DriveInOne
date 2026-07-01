@@ -1,3 +1,4 @@
+import mimetypes
 import os
 import tempfile
 import jwt
@@ -15,10 +16,12 @@ from api.security import (
 )
 from api.providers import load_providers
 from distribution.upload import DistributionUpload
+from distribution.download import DistributionDownload
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, StreamingResponse
+from urllib.parse import quote
 
 app = FastAPI(title="DriveInOne API")
 
@@ -28,6 +31,7 @@ app.add_middleware(
     allow_credentials=False,   # JWT goes in the Authorization header, not cookies, so this can stay False
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 bearer_scheme = HTTPBearer()
@@ -126,6 +130,48 @@ def list_files(current_user: dict = Depends(get_current_user)):
         for row in rows
     ]
     return {"username": current_user["username"], "user_id": current_user["user_id"], "files": files}
+
+
+@app.get("/files/{file_id}/download")
+def download_file(file_id: int, current_user: dict = Depends(get_current_user)):
+    """Reassemble and return a file owned by the authenticated user."""
+    conn = Database.get_instance()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT original_filename, total_size_bytes FROM files WHERE file_id = %s AND user_id = %s",
+        (file_id, current_user["user_id"]),
+    )
+    row = cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    filename, total_size_bytes = row
+    media_type, _ = mimetypes.guess_type(filename)
+    if not media_type:
+        media_type = "application/octet-stream"
+
+    def iter_file_bytes():
+        downloader = DistributionDownload()
+        for chunk in downloader.iter_download_bytes(file_id):
+            yield chunk
+
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"; filename*=UTF-8\'\'{quote(filename)}',
+        "Cache-Control": "no-store",
+    }
+    if total_size_bytes is not None:
+        headers["Content-Length"] = str(total_size_bytes)
+
+    try:
+        return StreamingResponse(
+            iter_file_bytes(),
+            media_type=media_type,
+            headers=headers,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/upload", status_code=201)

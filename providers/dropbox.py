@@ -5,9 +5,13 @@ import os
 import requests
 from urllib.parse import urlencode
 from dotenv import load_dotenv
+from dropbox.files import WriteMode, UploadSessionCursor, CommitInfo
 
 load_dotenv()
 
+
+DROPBOX_SIMPLE_UPLOAD_LIMIT = 150 * 1024 * 1024   # Dropbox's documented cap for /files/upload
+DROPBOX_SESSION_APPEND_SIZE = 8 * 1024 * 1024      # safe, efficient per-request size within a session
 
 class DropboxProvider(StorageProvider):
     AUTH_URL = "https://www.dropbox.com/oauth2/authorize"
@@ -62,8 +66,33 @@ class DropboxProvider(StorageProvider):
         print(f"[Dropbox] Uploaded {file_path} → /{remote_key}")
 
     def upload_bytes(self, data: bytes, remote_key: str):
-        self._client.files_upload(data, f"/{remote_key}")
-        print(f"[Dropbox] Uploaded chunk → /{remote_key}")
+        if len(data) <= DROPBOX_SIMPLE_UPLOAD_LIMIT:
+            self._client.files_upload(data, f"/{remote_key}", mode=WriteMode("overwrite"))
+            print(f"[Dropbox] Uploaded chunk → /{remote_key} ({len(data)} bytes, simple upload)")
+            return
+
+        print(f"[Dropbox] Chunk is {len(data)} bytes (>150MB) — using upload session for /{remote_key}")
+
+        session = self._client.files_upload_session_start(data[:DROPBOX_SESSION_APPEND_SIZE])
+        cursor = UploadSessionCursor(session_id=session.session_id, offset=DROPBOX_SESSION_APPEND_SIZE)
+        offset = DROPBOX_SESSION_APPEND_SIZE
+
+        while offset < len(data):
+            remaining = len(data) - offset
+            if remaining <= DROPBOX_SESSION_APPEND_SIZE:
+                commit = CommitInfo(path=f"/{remote_key}", mode=WriteMode("overwrite"))
+                self._client.files_upload_session_finish(
+                    data[offset:offset + remaining], cursor, commit
+                )
+                offset += remaining
+            else:
+                self._client.files_upload_session_append_v2(
+                    data[offset:offset + DROPBOX_SESSION_APPEND_SIZE], cursor
+                )
+                cursor.offset += DROPBOX_SESSION_APPEND_SIZE
+                offset += DROPBOX_SESSION_APPEND_SIZE
+
+        print(f"[Dropbox] Uploaded chunk via session → /{remote_key} ({len(data)} bytes)")
 
     def download_file(self, remote_key, local_path):
         self._client.files_download_to_file(local_path, f"/{remote_key}")

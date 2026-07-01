@@ -77,7 +77,7 @@ class GoogleDriveProvider(StorageProvider):
             body=file_metadata,
             media_body=media,
             fields="id, name"
-        ).execute()
+        ).execute(num_retries=5)
         print(f"[GoogleDrive] Uploaded chunk → {file['name']} (id: {file['id']})")
         return file
 
@@ -105,7 +105,7 @@ class GoogleDriveProvider(StorageProvider):
         results = self._service.files().list(
             q=f"name='{remote_key}'",
             fields="files(id, name)"
-        ).execute()
+        ).execute(num_retries=5)
         files = results.get("files", [])
         if not files:
             raise FileNotFoundError(f"Chunk '{remote_key}' not found in Google Drive")
@@ -117,7 +117,7 @@ class GoogleDriveProvider(StorageProvider):
         downloader = MediaIoBaseDownload(buffer, request)
         done = False
         while not done:
-            _, done = downloader.next_chunk()
+            _, done = downloader.next_chunk(num_retries=5)
 
         print(f"[GoogleDrive] Downloaded chunk '{remote_key}' ({buffer.tell()} bytes)")
         return buffer.getvalue()

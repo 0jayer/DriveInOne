@@ -147,6 +147,23 @@ class TestFilesEndpointAuth:
         token = create_token({"sub": str(user_id), "username": username})
         return {"Authorization": f"Bearer {token}"}
 
+    def test_valid_token_can_download_file(self, tmp_path):
+        payload = b"hello from download"
+        target = tmp_path / "downloaded.txt"
+        target.write_bytes(payload)
+
+        mock_conn = MagicMock()
+        with patch("database.db.Database.get_instance", return_value=mock_conn), \
+             patch("api.main.DistributionDownload") as mock_download_cls:
+            mock_download = mock_download_cls.return_value
+            mock_download.download.return_value = str(target)
+
+            resp = client.get("/files/42/download", headers=self._auth_header())
+
+        assert resp.status_code == 200
+        assert resp.content == payload
+        assert "downloaded.txt" in resp.headers["content-disposition"]
+
     def test_no_token_returns_401(self):
         resp = client.get("/files")
         assert resp.status_code == 403 or resp.status_code == 401

@@ -6,6 +6,8 @@ from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 from database.providers import get_provider_by_id
 
+GOOGLE_CREDENTIALS_PATH = "credentials/google_credentials_web.json"
+
 
 class DistributionDownload:
     def __init__(self):
@@ -25,7 +27,7 @@ class DistributionDownload:
 
 
         if provider_type == "gdrive":
-            instance = GoogleDriveProvider("credentials/google_credentials.json", token=token, refresh_token=refresh_token)
+            instance = GoogleDriveProvider(GOOGLE_CREDENTIALS_PATH, token=token, refresh_token=refresh_token)
         elif provider_type == "dropbox":
             instance = DropboxProvider(token=token, refresh_token=refresh_token)
         else:
@@ -46,7 +48,7 @@ class DistributionDownload:
             print(f"  {file_id:<6} {name:<30} {size:>12} {chunks:>7}  {uploaded_at[:19]}")
         return rows
 
-    def download(self, file_id, output_dir="."):
+    def iter_download_bytes(self, file_id):
         row = get_file_metadata(self._conn, file_id)
         if not row:
             raise FileNotFoundError(f"No file with file_id={file_id} in DB")
@@ -61,29 +63,44 @@ class DistributionDownload:
                 f"DB inconsistency: expected {total_chunks} chunks, found {len(chunks)}"
             )
 
+        file_hasher = hashlib.sha256()
+        for chunk_index, provider_id, remote_key, chunk_size, expected_chunk_checksum in chunks:
+            provider = self._load_provider(provider_id)
+            data = provider.download_bytes(remote_key)
+
+            actual_checksum = hashlib.sha256(data).hexdigest()
+            if actual_checksum != expected_chunk_checksum:
+                raise ValueError(
+                    f"Chunk {chunk_index} checksum mismatch — data may be corrupted"
+                )
+
+            file_hasher.update(data)
+            yield data
+            print(f"[Download] Chunk {chunk_index}: {len(data)} bytes ✓")
+
+        actual_file_checksum = file_hasher.hexdigest()
+        if actual_file_checksum != expected_checksum:
+            raise ValueError(
+                "Final file checksum mismatch — upload may have been corrupted."
+            )
+
+    def download(self, file_id, output_dir="."):
+        row = get_file_metadata(self._conn, file_id)
+        if not row:
+            raise FileNotFoundError(f"No file with file_id={file_id} in DB")
+
+        filename, total_size, total_chunks, expected_checksum = row
         os.makedirs(output_dir, exist_ok=True)
         output_path = os.path.join(output_dir, filename)
 
-        with open(output_path, "wb") as out_file:
-            for chunk_index, provider_id, remote_key, chunk_size, expected_chunk_checksum in chunks:
-                provider = self._load_provider(provider_id)
-                data = provider.download_bytes(remote_key)
-
-                actual_checksum = hashlib.sha256(data).hexdigest()
-                if actual_checksum != expected_chunk_checksum:
-                    raise ValueError(
-                        f"Chunk {chunk_index} checksum mismatch — data may be corrupted"
-                    )
-
-                out_file.write(data)
-                print(f"[Download] Chunk {chunk_index}: {len(data)} bytes ✓")
-
-        actual_file_checksum = self._file_checksum(output_path)
-        if actual_file_checksum != expected_checksum:
-            os.remove(output_path)
-            raise ValueError(
-                "Final file checksum mismatch — file deleted. Upload may have been corrupted."
-            )
+        try:
+            with open(output_path, "wb") as out_file:
+                for data in self.iter_download_bytes(file_id):
+                    out_file.write(data)
+        except Exception:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+            raise
 
         print(f"[Download] '{filename}' reassembled at '{output_path}' ✓")
         return output_path
