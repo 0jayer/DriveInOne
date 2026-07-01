@@ -11,18 +11,19 @@ DriveInOne is a virtual file system that connects all your cloud storage account
 
 ## Features
 
-- **Unified Storage View** — All your cloud accounts appear as one big drive
-- **Multi-Provider Support** — Google Drive and Dropbox connected, more planned
+- **Unified Storage View** — Multiple Google Drive and Dropbox accounts appear as one pooled storage experience
+- **Multi-Provider Support** — Files are distributed across connected providers automatically when needed
 - **Multi-User Accounts** — Signup/login with hashed passwords and JWT-based sessions; each user manages their own set of connected providers
-- **Web-Based OAuth Linking** — Connect Google Drive or Dropbox straight from the browser, no CLI needed
-- **Intelligent Distribution** — Greedy allocation fills providers by free space; splits large files across providers automatically
+- **Web-Based OAuth Linking** — Connect Google Drive or Dropbox directly from the browser, no CLI required
+- **Intelligent Distribution** — Greedy allocation fills providers by free space; large files are split across providers automatically
 - **Chunk Reassembly** — Split files are downloaded and stitched back together transparently
 - **SHA-256 Integrity Checks** — Every chunk and every file is verified on download
-- **OAuth Authentication** — Short-lived tokens with automatic refresh per provider
+- **OAuth Authentication** — Short-lived tokens with refresh support per provider
 - **Persistent Metadata** — PostgreSQL on Supabase tracks users, files, chunks, and provider info
 - **Parallel Uploads** — All chunks upload simultaneously via threading
-- **Storage Dashboard** — See live total, used, and free space per provider at a glance, in-browser
+- **Storage Dashboard** — See connected providers, capacity, uploads, and downloadable files in-browser
 - **REST API** — FastAPI backend with interactive docs at `/docs`
+- **Download Progress UI** — Large downloads show visible progress in the web dashboard
 
 ---
 
@@ -252,25 +253,18 @@ All tests are fully mocked — no real API credentials or live database connecti
 
 ---
 
-## Roadmap
+## Current Status
 
-- [x] Google Drive integration
-- [x] Dropbox integration with OAuth refresh tokens
-- [x] Greedy multi-provider file distribution
-- [x] Chunk upload and reassembly
-- [x] SHA-256 integrity verification
-- [x] PostgreSQL metadata storage
-- [x] Parallel uploads
-- [x] Full test suite with CI/CD
-- [x] Multi-user support with accounts and JWT sessions
-- [x] FastAPI web backend
-- [x] Web-based OAuth linking for Google Drive and Dropbox
-- [x] Web UI — login/signup, storage dashboard, drag-and-drop upload, file list
-- [ ] File download from the web UI (API endpoint in progress)
-- [ ] Disconnect/unlink a provider from the web UI
-- [ ] OneDrive integration
-- [ ] File search across all providers
-- [ ] AI-assisted storage management (exploratory)
+DriveInOne is now a working end-to-end cloud-storage distribution app with:
+
+- Google Drive and Dropbox OAuth linking from the web UI
+- Multi-account support for the same user
+- Upload distribution across multiple providers
+- Chunked download and reassembly
+- Integrity verification and download progress in the dashboard
+- A fully tested FastAPI backend and frontend flow
+
+No further roadmap items are planned for this version.
 
 ---
 
