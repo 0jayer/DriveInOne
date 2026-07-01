@@ -130,19 +130,6 @@ source .venv/bin/activate     # Linux/macOS
 pip install -r requirements.txt
 ```
 
-### Environment Setup
-
-Create a `.env` file in the project root (used for local development — see **Deployment** below for how these are set in production):
-
-```env
-DATABASE_URL=your_supabase_connection_string
-DROPBOX_APP_KEY=your_dropbox_app_key
-DROPBOX_APP_SECRET=your_dropbox_app_secret
-SECRET_KEY=a_long_random_string_for_signing_jwts
-FRONTEND_URL=http://127.0.0.1:8000
-GOOGLE_REDIRECT_URI=http://127.0.0.1:8000/accounts/gdrive/callback
-DROPBOX_REDIRECT_URI=http://127.0.0.1:8000/accounts/dropbox/callback
-```
 
 ### Database Setup
 
@@ -217,7 +204,7 @@ python main.py     # storage summary, upload, download
 
 ## Deployment
 
-DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL (e.g. `https://your-app.onrender.com`).
+DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL (e.g. `https://driveinone.onrender.com`).
 
 
 ### Redirect URIs — keep these in sync
