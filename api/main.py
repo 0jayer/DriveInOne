@@ -142,10 +142,11 @@ def download_file(file_id: int, current_user: dict = Depends(get_current_user)):
         (file_id, current_user["user_id"]),
     )
     row = cursor.fetchone()
-    if not row:
+    if not row or not isinstance(row, (tuple, list)) or len(row) < 2:
         raise HTTPException(status_code=404, detail="File not found")
 
-    filename, total_size_bytes = row
+    filename = row[0]
+    total_size_bytes = row[1]
     media_type, _ = mimetypes.guess_type(filename)
     if not media_type:
         media_type = "application/octet-stream"

@@ -153,10 +153,11 @@ class TestFilesEndpointAuth:
         target.write_bytes(payload)
 
         mock_conn = MagicMock()
+        mock_conn.cursor.return_value.fetchone.return_value = ("downloaded.txt", len(payload))
         with patch("database.db.Database.get_instance", return_value=mock_conn), \
              patch("api.main.DistributionDownload") as mock_download_cls:
             mock_download = mock_download_cls.return_value
-            mock_download.download.return_value = str(target)
+            mock_download.iter_download_bytes.return_value = [payload]
 
             resp = client.get("/files/42/download", headers=self._auth_header())
 

@@ -40,7 +40,8 @@ class DistributionFlowTests(unittest.TestCase):
             os.remove(tmp_path)
 
     def test_load_provider_uses_web_credentials_for_gdrive(self):
-        dist = DistributionDownload()
+        with patch("distribution.download.Database.get_instance", return_value=MagicMock()):
+            dist = DistributionDownload()
         with patch("distribution.download.get_provider_by_id", return_value=("gdrive", "token", "refresh")), \
              patch("distribution.download.GoogleDriveProvider") as mock_gdrive:
             dist._load_provider(7)
@@ -53,7 +54,8 @@ class DistributionFlowTests(unittest.TestCase):
 
     def test_download_reassembles_chunks_in_order(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            dist = DistributionDownload()
+            with patch("distribution.download.Database.get_instance", return_value=MagicMock()):
+                dist = DistributionDownload()
             fake_chunks = [
                 (0, 1, "chunk0", 3, hashlib.sha256(b"abc").hexdigest()),
                 (1, 2, "chunk1", 3, hashlib.sha256(b"def").hexdigest()),

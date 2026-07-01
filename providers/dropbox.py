@@ -67,7 +67,7 @@ class DropboxProvider(StorageProvider):
 
     def upload_bytes(self, data: bytes, remote_key: str):
         if len(data) <= DROPBOX_SIMPLE_UPLOAD_LIMIT:
-            self._client.files_upload(data, f"/{remote_key}", mode=WriteMode("overwrite"))
+            self._client.files_upload(data, f"/{remote_key}")
             print(f"[Dropbox] Uploaded chunk → /{remote_key} ({len(data)} bytes, simple upload)")
             return
 
