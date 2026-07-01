@@ -32,6 +32,9 @@ app = FastAPI(title="DriveInOne API")
 
 @app.on_event("startup")
 def initialize_database():
+    print(f"[Startup] FRONTEND_URL={FRONTEND_URL}")
+    print(f"[Startup] GOOGLE_REDIRECT_URI={GOOGLE_REDIRECT_URI}")
+    print(f"[Startup] DROPBOX_REDIRECT_URI={DROPBOX_REDIRECT_URI}")
     try:
         Database.init_db()
     except Exception as exc:
