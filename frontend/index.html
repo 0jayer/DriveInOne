@@ -62,8 +62,22 @@
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script>
-  // If a session already exists, skip straight to the dashboard.
-  if (getToken()) window.location.href = "dashboard.html";
+  // If a session already exists, verify it's still valid before skipping to the dashboard.
+  // (Previously this only checked whether a token was present in localStorage, which meant
+  // a stale/expired token from an earlier session would still bounce you straight past
+  // the login page. apiFetch() already clears the session and redirects with ?expired=1
+  // on a 401, so we just reuse that behavior here.)
+  if (getToken()) {
+    apiFetch("/files")
+      .then((resp) => {
+        if (resp.ok) window.location.href = "dashboard.html";
+        // Non-ok, non-401 responses just fall through to the login page as-is.
+      })
+      .catch(() => {
+        // apiFetch() throws on 401 after already calling clearSession() and redirecting.
+        // Nothing further to do here.
+      });
+  }
 
   // Session-expired banner
   const params = new URLSearchParams(window.location.search);
