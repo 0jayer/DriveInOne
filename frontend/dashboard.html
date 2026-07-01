@@ -30,6 +30,10 @@
         <span class="section-eyebrow">Storage pool</span>
         <h2>Connected drives</h2>
       </div>
+      <div class="section-actions">
+        <button class="btn btn-ghost" onclick="connectGdrive()">Connect Google Drive</button>
+        <button class="btn btn-ghost" onclick="connectDropbox()">Connect Dropbox</button>
+      </div>
     </div>
 
     <div class="providers-grid" id="providersGrid">
@@ -180,13 +184,19 @@ async function loadProviders() {
 }
 
 function renderProviders(providers) {
-  const byType = {};
-  providers.forEach(p => byType[p.provider_type] = p);
+  if (!providers.length) {
+    providersGrid.innerHTML = `
+      <div class="provider-empty">
+        <p>No storage accounts connected yet.</p>
+        <button class="btn btn-primary" onclick="connectGdrive()">Connect Google Drive</button>
+      </div>
+    `;
+    accountsNote.style.display = "none";
+    poolReadout.style.display = "none";
+    return;
+  }
 
-  let html = "";
-  html += byType.gdrive ? providerCardHTML(byType.gdrive) : emptyProviderCardHTML("gdrive", "Google Drive", "connectGdrive");
-  html += byType.dropbox ? providerCardHTML(byType.dropbox) : emptyProviderCardHTML("dropbox", "Dropbox", "connectDropbox");
-  providersGrid.innerHTML = html;
+  providersGrid.innerHTML = providers.map(providerCardHTML).join("");
 
   const totalFree = providers.reduce((sum, p) => sum + (p.total_space_bytes - p.used_space_bytes), 0);
   if (providers.length > 0) {

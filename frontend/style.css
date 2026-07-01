@@ -257,6 +257,17 @@ a:focus-visible {
 
 .section-head h2 { font-size: 16px; }
 
+.section-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.section-actions .btn {
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
 .section-eyebrow {
   font-family: var(--font-mono);
   font-size: 11px;

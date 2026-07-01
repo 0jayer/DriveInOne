@@ -10,7 +10,28 @@ def register_provider(conn, user_id, provider_type, email, nickname, total, used
     )
     existing = cursor.fetchone()
     if existing:
-        print(f"[DB] {provider_type} account '{email}' already registered for this user (provider_id={existing[0]}) — skipping")
+        cursor.execute("""
+            UPDATE providers SET
+                account_nickname = %s,
+                token = %s,
+                refresh_token = %s,
+                total_space_bytes = %s,
+                used_space_bytes = %s,
+                website_url = %s,
+                last_synced = %s
+            WHERE provider_id = %s
+        """, (
+            nickname,
+            token,
+            refresh_token,
+            total,
+            used,
+            url,
+            datetime.datetime.now(datetime.UTC).isoformat(),
+            existing[0],
+        ))
+        conn.commit()
+        print(f"[DB] Updated {provider_type} account '{email}' (provider_id={existing[0]})")
         return existing[0]
 
     cursor.execute("""
