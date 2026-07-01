@@ -9,7 +9,7 @@ import json
 import io
 import os
 
-
+CREDENTIALS_PATH = "/etc/secrets/google_credentials_web.json" if os.path.exists("/etc/secrets/google_credentials_web.json") else "credentials/google_credentials_web.json"
 class GoogleDriveProvider(StorageProvider):
     SCOPES = ["https://www.googleapis.com/auth/drive"]
 

@@ -6,8 +6,7 @@ from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 from database.providers import get_provider_by_id
 
-GOOGLE_CREDENTIALS_PATH = "credentials/google_credentials_web.json"
-
+GOOGLE_CREDENTIALS_PATH = "/etc/secrets/google_credentials_web.json" if os.path.exists("/etc/secrets/google_credentials_web.json") else "credentials/google_credentials_web.json"
 
 class DistributionDownload:
     def __init__(self):

@@ -55,7 +55,11 @@ bearer_scheme = HTTPBearer()
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5500")
 # --- OAuth config ---
 GOOGLE_CREDENTIALS_PATH = "credentials/google_credentials.json"          # Desktop client — CLI (setup.py) only
-GOOGLE_WEB_CREDENTIALS_PATH = "credentials/google_credentials_web.json"  # Web client — API redirect flow
+GOOGLE_WEB_CREDENTIALS_PATH = (
+    "/etc/secrets/google_credentials_web.json"
+    if os.path.exists("/etc/secrets/google_credentials_web.json")
+    else "credentials/google_credentials_web.json"
+)  # Web client — API redirect flow
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://127.0.0.1:8000/accounts/gdrive/callback")
 DROPBOX_REDIRECT_URI = os.getenv("DROPBOX_REDIRECT_URI", "http://127.0.0.1:8000/accounts/dropbox/callback")
 

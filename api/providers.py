@@ -1,8 +1,13 @@
 from database.providers import get_providers_for_user
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
+import os
 
-GOOGLE_WEB_CREDENTIALS_PATH = "credentials/google_credentials_web.json"
+GOOGLE_WEB_CREDENTIALS_PATH = (
+    "/etc/secrets/google_credentials_web.json"
+    if os.path.exists("/etc/secrets/google_credentials_web.json")
+    else "credentials/google_credentials_web.json"
+)
 
 
 def load_providers(conn, user_id):
