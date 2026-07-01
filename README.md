@@ -29,13 +29,14 @@ DriveInOne is a virtual file system that connects all your cloud storage account
 
 ## Architecture
 
-DriveInOne uses a provider-based architecture. Each cloud storage service implements a common interface defined in `providers/base.py`. A greedy allocation algorithm distributes file chunks across providers, and a PostgreSQL database tracks all metadata needed for reassembly. A FastAPI layer exposes everything over HTTP, backed by a plain HTML/CSS/JS frontend.
+DriveInOne uses a provider-based architecture. Each cloud storage service implements a common interface defined in `providers/base.py`. A greedy allocation algorithm distributes file chunks across providers, and a PostgreSQL database tracks all metadata needed for reassembly. A FastAPI layer exposes everything over HTTP, and serves the plain HTML/CSS/JS frontend directly as static files — the whole app runs as a single deployable service.
 
 ```
 DriveInOne/
 │
 ├── api/
-│   ├── main.py            # FastAPI app — auth, upload, accounts, OAuth callbacks
+│   ├── main.py            # FastAPI app — auth, upload, accounts, OAuth callbacks,
+│   │                       # and static file serving for the frontend
 │   ├── security.py        # Password hashing (bcrypt) + JWT creation/validation
 │   ├── providers.py       # Shared provider-loading logic (CLI + API)
 │   └── __init__.py
@@ -83,7 +84,8 @@ DriveInOne/
 ├── .github/workflows/
 │   └── tests.yml           # CI: runs full test suite on every push
 │
-├── credentials/            # OAuth credential files (gitignored)
+├── credentials/            # OAuth credential files (gitignored — see Google Drive Setup)
+├── Dockerfile               # Container definition used for the Render deployment
 ├── setup.py                # Interactive provider registration CLI (local/dev use)
 ├── main.py                 # CLI entry point: storage summary, upload, download
 └── requirements.txt
@@ -98,12 +100,13 @@ DriveInOne/
 | Language | Python 3.13+ |
 | Backend | FastAPI + Uvicorn |
 | Auth | bcrypt password hashing, JWT (PyJWT, HS256) |
-| Frontend | Plain HTML/CSS/JS — no framework, no build step |
+| Frontend | Plain HTML/CSS/JS — no framework, no build step, served by FastAPI |
 | Database | PostgreSQL (Supabase) |
 | Google Drive | Google Drive API v3, OAuth 2.0 (Desktop + Web client flows) |
 | Dropbox | Dropbox API v2, OAuth 2.0 with refresh tokens |
 | Testing | pytest + pytest-mock (fully mocked, no live credentials or DB needed) |
 | CI/CD | GitHub Actions |
+| Hosting | Render (Docker deployment — backend and frontend served from one service) |
 
 ---
 
@@ -129,13 +132,16 @@ pip install -r requirements.txt
 
 ### Environment Setup
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root (used for local development — see **Deployment** below for how these are set in production):
 
 ```env
 DATABASE_URL=your_supabase_connection_string
 DROPBOX_APP_KEY=your_dropbox_app_key
 DROPBOX_APP_SECRET=your_dropbox_app_secret
 SECRET_KEY=a_long_random_string_for_signing_jwts
+FRONTEND_URL=http://127.0.0.1:8000
+GOOGLE_REDIRECT_URI=http://127.0.0.1:8000/accounts/gdrive/callback
+DROPBOX_REDIRECT_URI=http://127.0.0.1:8000/accounts/dropbox/callback
 ```
 
 ### Database Setup
@@ -155,36 +161,35 @@ DriveInOne uses **two** Google OAuth clients:
 1. **Desktop client** — for the local CLI flow (`setup.py`)
    - Go to the [Google Cloud Console](https://console.cloud.google.com/), enable the **Google Drive API**
    - Create OAuth 2.0 credentials of type **Desktop app**, download the JSON
-   - Place it at `credentials/google_credentials.json`
+   - Place it at `credentials/google_credentials.json` (local use only — never deployed)
 
 2. **Web client** — for the browser-based "Connect Google Drive" flow
    - Create a second OAuth 2.0 credential of type **Web application** in the same project
-   - Add `http://127.0.0.1:8000/accounts/gdrive/callback` as an authorized redirect URI
-   - Download the JSON and place it at `credentials/google_credentials_web.json`
+   - Under **Authorized redirect URIs**, add both:
+     - `http://127.0.0.1:8000/accounts/gdrive/callback` (local dev)
+     - your production callback, e.g. `https://your-app.onrender.com/accounts/gdrive/callback`
+   - Download the JSON and place it at `credentials/google_credentials_web.json` for local dev
 
-Both files are gitignored — they contain real secrets.
+Both files are gitignored — they contain real secrets and must never be committed. For production, see **Deployment** below.
 
 ### Dropbox Setup
 
 1. Go to the [Dropbox App Console](https://www.dropbox.com/developers/apps)
 2. Create a new app with **Scoped Access**
-3. Note your **App key** and **App secret** — add them to `.env`
-4. Add `http://127.0.0.1:8000/accounts/dropbox/callback` to the app's redirect URI allowlist (needed for the web-based connect flow)
+3. Note your **App key** and **App secret** — add them to `.env` locally, and to your host's environment variables in production
+4. Add both redirect URIs to the app's allowlist:
+   - `http://127.0.0.1:8000/accounts/dropbox/callback` (local dev)
+   - your production callback, e.g. `https://your-app.onrender.com/accounts/dropbox/callback`
 
-### Running the app
+### Running the app locally
 
-**Backend:**
+DriveInOne's FastAPI backend serves the frontend directly, so a single process runs the whole app:
+
 ```bash
 uvicorn api.main:app --reload
 ```
-API docs available at `http://127.0.0.1:8000/docs`.
 
-**Frontend:**
-```bash
-cd frontend
-python -m http.server 5500
-```
-Open `http://127.0.0.1:5500` in a browser — sign up, log in, connect a provider, and upload a file.
+Open `http://127.0.0.1:8000` in a browser — sign up, log in, connect a provider, and upload a file. Interactive API docs are available at `http://127.0.0.1:8000/docs`.
 
 **CLI (alternative, local-only):**
 ```bash
@@ -207,6 +212,20 @@ python main.py     # storage summary, upload, download
   3) Add another account
   4) Exit
 ```
+
+---
+
+## Deployment
+
+DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL (e.g. `https://your-app.onrender.com`).
+
+
+### Redirect URIs — keep these in sync
+
+Whenever the deployed URL changes, update the redirect URI in **three** places, or OAuth will fail with an `Invalid redirect_uri` error:
+1. Google Cloud Console → OAuth client → Authorized redirect URIs
+2. Dropbox App Console → redirect URI allowlist
+3. Render environment variables (`GOOGLE_REDIRECT_URI`, `DROPBOX_REDIRECT_URI`)
 
 ---
 
@@ -263,6 +282,7 @@ DriveInOne is now a working end-to-end cloud-storage distribution app with:
 - Chunked download and reassembly
 - Integrity verification and download progress in the dashboard
 - A fully tested FastAPI backend and frontend flow
+- Single-service deployment on Render 
 
 No further roadmap items are planned for this version.
 
