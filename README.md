@@ -207,12 +207,15 @@ python main.py     # storage summary, upload, download
 DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL [https://driveinone.onrender.com](https://driveinone.onrender.com).
 
 
-### Redirect URIs — keep these in sync
+---
 
-Whenever the deployed URL changes, update the redirect URI in **three** places, or OAuth will fail with an `Invalid redirect_uri` error:
-1. Google Cloud Console → OAuth client → Authorized redirect URIs
-2. Dropbox App Console → redirect URI allowlist
-3. Render environment variables (`GOOGLE_REDIRECT_URI`, `DROPBOX_REDIRECT_URI`)
+ 
+## Screenshot
+ 
+<p align="center">
+  <img src="assets/test_use.png" alt="DriveInOne dashboard showing connected Google Drive and Dropbox accounts, pooled storage total, and an uploaded file" width="800"/>
+</p>
+
 
 ---
 
