@@ -204,7 +204,7 @@ python main.py     # storage summary, upload, download
 
 ## Deployment
 
-DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL (e.g. `https://driveinone.onrender.com`).
+DriveInOne is deployed as a single Docker service on [Render](https://render.com), which builds and runs the included `Dockerfile`. Because FastAPI serves both the API routes and the static frontend, there's no separate frontend host — everything lives at one URL `[https://driveinone.onrender.com](https://driveinone.onrender.com)`.
 
 
 ### Redirect URIs — keep these in sync
