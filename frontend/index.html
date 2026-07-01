@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveInOne — Sign in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="auth-shell">
+  <div class="auth-card">
+
+    <div class="auth-brand">
+      <span class="mark"></span>
+      <h1>DriveInOne</h1>
+    </div>
+    <p class="auth-sub" id="authSub">One pool of storage, split across the drives you already have.</p>
+
+    <div class="auth-error" id="authError"></div>
+
+    <!-- Login form -->
+    <form id="loginForm">
+      <div class="field">
+        <label for="loginUsername">Username</label>
+        <input type="text" id="loginUsername" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="loginPassword">Password</label>
+        <input type="password" id="loginPassword" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="loginBtn">Sign in</button>
+    </form>
+
+    <!-- Signup form -->
+    <form id="signupForm" style="display:none;">
+      <div class="field">
+        <label for="signupUsername">Username</label>
+        <input type="text" id="signupUsername" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="signupDisplayName">Display name <span class="mono" style="color:var(--text-dim);">(optional)</span></label>
+        <input type="text" id="signupDisplayName" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="signupPassword">Password</label>
+        <input type="password" id="signupPassword" autocomplete="new-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="signupBtn">Create account</button>
+    </form>
+
+    <p class="auth-switch">
+      <span id="switchToSignup">New here? <a href="#" id="showSignup">Create an account</a></span>
+      <span id="switchToLogin" style="display:none;">Already have an account? <a href="#" id="showLogin">Sign in</a></span>
+    </p>
+
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+  // If a session already exists, skip straight to the dashboard.
+  if (getToken()) window.location.href = "dashboard.html";
+
+  // Session-expired banner
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("expired")) {
+    const err = document.getElementById("authError");
+    err.textContent = "Your session expired — sign in again.";
+    err.classList.add("show");
+  }
+
+  const loginForm = document.getElementById("loginForm");
+  const signupForm = document.getElementById("signupForm");
+  const authError = document.getElementById("authError");
+  const authSub = document.getElementById("authSub");
+
+  document.getElementById("showSignup").onclick = (e) => {
+    e.preventDefault();
+    loginForm.style.display = "none";
+    signupForm.style.display = "block";
+    document.getElementById("switchToSignup").style.display = "none";
+    document.getElementById("switchToLogin").style.display = "inline";
+    authSub.textContent = "Create an account to start pooling storage.";
+    authError.classList.remove("show");
+  };
+
+  document.getElementById("showLogin").onclick = (e) => {
+    e.preventDefault();
+    signupForm.style.display = "none";
+    loginForm.style.display = "block";
+    document.getElementById("switchToLogin").style.display = "none";
+    document.getElementById("switchToSignup").style.display = "inline";
+    authSub.textContent = "One pool of storage, split across the drives you already have.";
+    authError.classList.remove("show");
+  };
+
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authError.classList.remove("show");
+    const btn = document.getElementById("loginBtn");
+    btn.disabled = true;
+    btn.textContent = "Signing in…";
+    try {
+      const username = document.getElementById("loginUsername").value.trim();
+      const password = document.getElementById("loginPassword").value;
+      const data = await login(username, password);
+      saveSession(data.access_token, username);
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      authError.textContent = err.message;
+      authError.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Sign in";
+    }
+  });
+
+  signupForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    authError.classList.remove("show");
+    const btn = document.getElementById("signupBtn");
+    btn.disabled = true;
+    btn.textContent = "Creating account…";
+    try {
+      const username = document.getElementById("signupUsername").value.trim();
+      const password = document.getElementById("signupPassword").value;
+      await signup(username, password);
+      // Auto-login right after signup so the user isn't asked to type the password twice
+      const data = await login(username, password);
+      saveSession(data.access_token, username);
+      window.location.href = "dashboard.html";
+    } catch (err) {
+      authError.textContent = err.message;
+      authError.classList.add("show");
+      btn.disabled = false;
+      btn.textContent = "Create account";
+    }
+  });
+</script>
+
+</body>
+</html>

@@ -4,6 +4,7 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload, MediaIoBaseUpload
+from google_auth_oauthlib.flow import Flow 
 import json
 import io
 import os
@@ -157,3 +158,26 @@ class GoogleDriveProvider(StorageProvider):
     def get_free_space(self) -> int:
         total, used = self.get_total_space()
         return total - used
+    
+    @staticmethod
+    def get_authorization_url(credentials_path, redirect_uri, state):
+        flow = Flow.from_client_secrets_file(
+            credentials_path, scopes=GoogleDriveProvider.SCOPES, redirect_uri=redirect_uri,
+            autogenerate_code_verifier=False,   # ← add this
+        )
+        auth_url, _ = flow.authorization_url(
+            access_type="offline",
+            prompt="consent",
+            include_granted_scopes="true",
+            state=state,
+        )
+        return auth_url
+
+    @staticmethod
+    def exchange_code(credentials_path, redirect_uri, code):
+        flow = Flow.from_client_secrets_file(
+            credentials_path, scopes=GoogleDriveProvider.SCOPES, redirect_uri=redirect_uri
+        )
+        flow.fetch_token(code=code)
+        creds = flow.credentials
+        return creds.token, creds.refresh_token

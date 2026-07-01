@@ -2,6 +2,7 @@ import os
 from database.db import Database
 from database.users import get_or_create_user
 from database.providers import get_providers_for_user
+from api.providers import load_providers
 from providers.gdrive import GoogleDriveProvider
 from providers.dropbox import DropboxProvider
 from distribution.upload import DistributionUpload

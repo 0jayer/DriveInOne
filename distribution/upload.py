@@ -7,8 +7,9 @@ from database.files import insert_file, insert_chunk
 
 
 class DistributionUpload:
-    def __init__(self, file_path, providers):
+    def __init__(self, file_path, providers, original_filename=None):
         self.file_path = file_path
+        self.original_filename = original_filename or os.path.basename(file_path)
         self.file_size = os.path.getsize(file_path)
         self.providers = providers
         self._lock = threading.Lock()
@@ -51,7 +52,7 @@ class DistributionUpload:
         self._record_to_db(owner, virtual_path)
 
     def _upload_chunk(self, provider, size, offset, chunk_index, total_chunks):
-        filename = os.path.basename(self.file_path)
+        filename = self.original_filename
 
         if total_chunks == 1:
             remote_key = filename
@@ -84,7 +85,7 @@ class DistributionUpload:
         return sha256.hexdigest()
 
     def _record_to_db(self, owner, virtual_path):
-        filename = os.path.basename(self.file_path)
+        filename = self.original_filename   
         file_ext = os.path.splitext(filename)[1] or "unknown"
         virtual_path = virtual_path or f"/{filename}"
         total_chunks = len(self._results)

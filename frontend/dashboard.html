@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveInOne — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="auth-brand">
+    <span class="mark"></span>
+    <h1>DriveInOne</h1>
+  </div>
+  <div class="topbar-user">
+    <span id="usernameLabel" class="mono"></span>
+    <button class="btn btn-ghost" id="logoutBtn">Sign out</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- Connected storage -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">Storage pool</span>
+        <h2>Connected drives</h2>
+      </div>
+    </div>
+
+    <div class="providers-grid" id="providersGrid">
+      <!-- populated by JS -->
+    </div>
+
+    <div class="pool-readout" id="poolReadout" style="display:none;">
+      <span class="label">Total free space across all drives</span>
+      <span class="value mono"><span id="poolFreeValue">—</span></span>
+    </div>
+
+    <p id="accountsNote" class="mono" style="display:none; font-size:11px; color:var(--text-dim); margin-top:14px;"></p>
+  </div>
+
+  <!-- Upload -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">Add a file</span>
+        <h2>Upload</h2>
+      </div>
+    </div>
+
+    <div class="dropzone" id="dropzone">
+      <div class="dz-icon">↑</div>
+      <p><strong style="color:var(--text);">Click to choose a file</strong> or drag one here</p>
+      <p>It'll be split across your connected drives automatically</p>
+      <input type="file" id="fileInput">
+    </div>
+
+    <div class="upload-progress" id="uploadProgress">
+      <div class="upload-progress-bar">
+        <div class="upload-progress-bar-fill" id="uploadProgressFill"></div>
+      </div>
+      <div class="upload-status mono" id="uploadStatus"></div>
+    </div>
+  </div>
+
+  <!-- Files -->
+  <div class="section">
+    <div class="section-head">
+      <div>
+        <span class="section-eyebrow">Everything you've stored</span>
+        <h2>Files</h2>
+      </div>
+    </div>
+
+    <div id="filesContainer">
+      <!-- populated by JS -->
+    </div>
+  </div>
+
+</div>
+
+<script src="app.js"></script>
+<script>
+requireAuth();
+
+// Landed here right after connecting a provider via OAuth redirect
+const urlParams = new URLSearchParams(window.location.search);
+const justConnected = urlParams.get("connected");
+if (justConnected) {
+  const label = justConnected === "gdrive" ? "Google Drive" : "Dropbox";
+  showToast(`${label} connected`, "success");
+  window.history.replaceState({}, "", "dashboard.html"); // clean the URL
+}
+
+document.getElementById("usernameLabel").textContent = getUsername() || "";
+document.getElementById("logoutBtn").onclick = logout;
+
+// ---------- Connected providers ----------
+
+const providersGrid = document.getElementById("providersGrid");
+const poolReadout = document.getElementById("poolReadout");
+const poolFreeValue = document.getElementById("poolFreeValue");
+const accountsNote = document.getElementById("accountsNote");
+
+function providerCardHTML(p) {
+  const usedPct = p.total_space_bytes ? Math.round((p.used_space_bytes / p.total_space_bytes) * 100) : 0;
+  const label = p.provider_type === "gdrive" ? "Google Drive" : "Dropbox";
+  return `
+    <div class="provider-card">
+      <div class="provider-card-head">
+        <span class="provider-name">${label}</span>
+        <span class="provider-badge">Connected</span>
+      </div>
+      <div class="provider-email">${p.account_email}</div>
+      <div class="gauge">
+        <div class="gauge-fill" style="width:${usedPct}%"></div>
+      </div>
+      <div class="gauge-readout">
+        <span class="used">${formatBytes(p.used_space_bytes)} used</span>
+        <span>${formatBytes(p.total_space_bytes)} total</span>
+      </div>
+    </div>
+  `;
+}
+
+function emptyProviderCardHTML(type, label, onClickFn) {
+  return `
+    <div class="provider-card provider-empty">
+      <p>${label} isn't connected yet</p>
+      <button class="btn btn-primary" onclick="${onClickFn}()">Connect ${label}</button>
+    </div>
+  `;
+}
+
+async function connectGdrive() {
+  try {
+    const url = await getGdriveAuthorizeUrl();
+    window.location.href = url;
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function connectDropbox() {
+  try {
+    const url = await getDropboxAuthorizeUrl();
+    window.location.href = url;
+  } catch (err) {
+    showToast(err.message, "error");
+  }
+}
+
+async function loadProviders() {
+  // GET /accounts doesn't exist in the API yet — this call is written defensively
+  // so the dashboard still works (just without capacity gauges) until it's added.
+  try {
+    const resp = await apiFetch("/accounts");
+    if (resp.status === 404) {
+      renderProvidersFallback();
+      return;
+    }
+    if (!resp.ok) throw new Error();
+    const data = await resp.json();
+    renderProviders(data.providers || []);
+  } catch {
+    renderProvidersFallback();
+  }
+}
+
+function renderProviders(providers) {
+  const byType = {};
+  providers.forEach(p => byType[p.provider_type] = p);
+
+  let html = "";
+  html += byType.gdrive ? providerCardHTML(byType.gdrive) : emptyProviderCardHTML("gdrive", "Google Drive", "connectGdrive");
+  html += byType.dropbox ? providerCardHTML(byType.dropbox) : emptyProviderCardHTML("dropbox", "Dropbox", "connectDropbox");
+  providersGrid.innerHTML = html;
+
+  const totalFree = providers.reduce((sum, p) => sum + (p.total_space_bytes - p.used_space_bytes), 0);
+  if (providers.length > 0) {
+    poolReadout.style.display = "flex";
+    poolFreeValue.innerHTML = `${formatBytes(totalFree)}`;
+  }
+  accountsNote.style.display = "none";
+}
+
+function renderProvidersFallback() {
+  // No /accounts endpoint yet — show connect buttons for both, no live capacity data.
+  providersGrid.innerHTML =
+    emptyProviderCardHTML("gdrive", "Google Drive", "connectGdrive") +
+    emptyProviderCardHTML("dropbox", "Dropbox", "connectDropbox");
+  accountsNote.textContent = "Capacity data needs a GET /accounts endpoint on the API — not built yet.";
+  accountsNote.style.display = "block";
+}
+
+loadProviders();
+
+// ---------- Upload ----------
+
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const uploadProgress = document.getElementById("uploadProgress");
+const uploadProgressFill = document.getElementById("uploadProgressFill");
+const uploadStatus = document.getElementById("uploadStatus");
+
+dropzone.addEventListener("click", () => fileInput.click());
+
+dropzone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropzone.classList.add("drag-over");
+});
+
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag-over"));
+
+dropzone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropzone.classList.remove("drag-over");
+  if (e.dataTransfer.files.length) handleUpload(e.dataTransfer.files[0]);
+});
+
+fileInput.addEventListener("change", () => {
+  if (fileInput.files.length) handleUpload(fileInput.files[0]);
+});
+
+async function handleUpload(file) {
+  uploadProgress.classList.add("show");
+  uploadProgressFill.style.width = "0%";
+  uploadStatus.className = "upload-status mono";
+  uploadStatus.textContent = `Uploading ${file.name}…`;
+
+  try {
+    const result = await uploadFile(file, (pct) => {
+      uploadProgressFill.style.width = `${pct}%`;
+    });
+    uploadStatus.className = "upload-status mono success";
+    uploadStatus.textContent = `Done — ${result.filename} split into ${result.chunks} chunk${result.chunks === 1 ? "" : "s"}`;
+    showToast(`${result.filename} uploaded`, "success");
+    fileInput.value = "";
+    loadFiles();
+    loadProviders(); // refresh capacity after upload consumes space
+  } catch (err) {
+    uploadProgress.classList.remove("show");
+    showToast(err.message, "error");
+  }
+}
+
+// ---------- File list ----------
+
+const filesContainer = document.getElementById("filesContainer");
+
+async function loadFiles() {
+  try {
+    const data = await fetchFiles();
+    renderFiles(data.files || []);
+  } catch (err) {
+    filesContainer.innerHTML = `<div class="empty-state"><span class="dz-icon">!</span>Couldn't load your files — try refreshing.</div>`;
+  }
+}
+
+function renderFiles(files) {
+  if (files.length === 0) {
+    filesContainer.innerHTML = `
+      <div class="empty-state">
+        <span class="dz-icon">∅</span>
+        Nothing uploaded yet — the first file you add starts the pool.
+      </div>
+    `;
+    return;
+  }
+
+  const rows = files.map(f => `
+    <tr>
+      <td>
+        <div class="file-name">${f.filename}</div>
+      </td>
+      <td class="file-meta">${formatBytes(f.size_bytes)}</td>
+      <td class="file-meta">
+        ${f.total_chunks} chunk${f.total_chunks === 1 ? "" : "s"}
+      </td>
+      <td class="file-meta">${formatDate(f.uploaded_at)}</td>
+    </tr>
+  `).join("");
+
+  filesContainer.innerHTML = `
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Chunks</th>
+          <th>Uploaded</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+loadFiles();
+
+// ---------- Handle returning from an OAuth callback ----------
+// The callback endpoints currently return raw JSON, not a redirect back here.
+// If the user manually navigates back to the dashboard after connecting,
+// just make sure the provider list is fresh.
+window.addEventListener("focus", () => {
+  loadProviders();
+});
+</script>
+
+</body>
+</html>

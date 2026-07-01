@@ -42,7 +42,7 @@ def get_provider_by_id(conn, provider_id):
 def get_providers_for_user(conn, user_id):
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT provider_id, provider_type, token, refresh_token
+        SELECT provider_id, provider_type, account_email, token, refresh_token
         FROM providers
         WHERE user_id = %s
         ORDER BY provider_id

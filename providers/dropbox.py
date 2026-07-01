@@ -2,18 +2,22 @@ from providers.base import StorageProvider
 import dropbox
 from dropbox import DropboxOAuth2FlowNoRedirect
 import os
+import requests
+from urllib.parse import urlencode
 from dotenv import load_dotenv
 
 load_dotenv()
 
 
 class DropboxProvider(StorageProvider):
+    AUTH_URL = "https://www.dropbox.com/oauth2/authorize"
+    TOKEN_URL = "https://api.dropboxapi.com/oauth2/token"
+
     def __init__(self, token=None, refresh_token=None):
         super().__init__(bucket="dropbox", region="global")
         self._app_key = os.getenv("DROPBOX_APP_KEY")
         self._app_secret = os.getenv("DROPBOX_APP_SECRET")
         self._client = None
-
         if token and refresh_token:
             # Load from DB tokens
             self._client = dropbox.Dropbox(
@@ -22,26 +26,22 @@ class DropboxProvider(StorageProvider):
                 app_key=self._app_key,
                 app_secret=self._app_secret,
             )
-            print("[Dropbox] Authenticated successfully")    # add this
+            print("[Dropbox] Authenticated successfully")
         else:
-            # Run OAuth flow
+            # Run OAuth flow (CLI only)
             self._client = self._run_oauth_flow()
 
     def _run_oauth_flow(self):
         auth_flow = DropboxOAuth2FlowNoRedirect(
             self._app_key,
             self._app_secret,
-            token_access_type="offline"  # offline = gets refresh token
+            token_access_type="offline"
         )
-
         authorize_url = auth_flow.start()
         print(f"\n[Dropbox] Visit this URL to authorize:\n{authorize_url}\n")
         auth_code = input("Enter the authorization code here: ").strip()
-
         oauth_result = auth_flow.finish(auth_code)
 
-        # Save tokens to .env temporarily so setup.py can read them
-        # In the web app these go straight to DB
         self._access_token = oauth_result.access_token
         self._refresh_token = oauth_result.refresh_token
 
@@ -103,3 +103,30 @@ class DropboxProvider(StorageProvider):
     def get_free_space(self) -> int:
         total, used = self.get_total_space()
         return total - used
+
+    @staticmethod
+    def get_authorization_url(redirect_uri, state):
+        app_key = os.getenv("DROPBOX_APP_KEY")
+        params = {
+            "client_id": app_key,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "token_access_type": "offline",
+            "state": state,
+        }
+        return f"{DropboxProvider.AUTH_URL}?{urlencode(params)}"
+
+    @staticmethod
+    def exchange_code(redirect_uri, code):
+        app_key = os.getenv("DROPBOX_APP_KEY")
+        app_secret = os.getenv("DROPBOX_APP_SECRET")
+        resp = requests.post(DropboxProvider.TOKEN_URL, data={
+            "code": code,
+            "grant_type": "authorization_code",
+            "client_id": app_key,
+            "client_secret": app_secret,
+            "redirect_uri": redirect_uri,
+        })
+        resp.raise_for_status()
+        data = resp.json()
+        return data["access_token"], data.get("refresh_token")
