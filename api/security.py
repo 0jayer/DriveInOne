@@ -28,7 +28,7 @@ def create_token(data: dict, expires_in_minutes: int = None, purpose: str = "acc
         if expires_in_minutes is not None
         else timedelta(hours=TOKEN_EXPIRY_HOURS)
     )
-    payload["exp"] = datetime.now(timezone.utc) + expiry
+    payload["exp"] = int((datetime.now(timezone.utc) + expiry).timestamp())
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
